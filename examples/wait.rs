@@ -1,13 +1,14 @@
 use core::time::Duration;
 use futures::stream::StreamExt;
 use futures_retry::{RetryPolicy, StreamRetryExt};
+use pin_utils::pin_mut;
 use reqwest::Client;
 use reqwest_eventsource::{Error, RequestBuilderExt};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::new();
-    let mut stream = client
+    let stream = client
         .get("http://localhost:7020/notifications")
         .eventsource()?
         .retry(|err| match err {
@@ -20,7 +21,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 RetryPolicy::<()>::Repeat
             }
         });
-
+    pin_mut!(stream);
     while let Some(event) = stream.next().await {
         match event {
             Ok((event, _)) => println!(
