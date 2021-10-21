@@ -1,8 +1,9 @@
 [package]
 name = "reqwest-eventsource"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Julian Popescu <jpopesculian@gmail.com>"]
 edition = "2018"
+resolver = "2"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 homepage = "https://github.com/jpopesculian/reqwest-eventsource"
@@ -13,7 +14,7 @@ keywords = ["sse", "eventsource", "reqwest", "stream", "event"]
 categories = ["web-programming::http-client", "no-std", "parsing", "asynchronous"]
 
 [dependencies]
-eventsource-stream = "0.1.0"
+eventsource-stream = "0.1.2"
 reqwest = { version = "0.11", default-features = false, features = ["stream"] }
 futures-core = "0.3.5"
 
