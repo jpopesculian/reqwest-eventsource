@@ -3,7 +3,7 @@ use futures::stream::StreamExt;
 use futures_retry::{RetryPolicy, StreamRetryExt};
 use pin_utils::pin_mut;
 use reqwest::Client;
-use reqwest_eventsource::{Error, RequestBuilderExt};
+use reqwest_eventsource::{EventStreamError, RequestBuilderExt};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -12,11 +12,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .get("http://localhost:7020/notifications")
         .eventsource()?
         .retry(|err| match err {
-            Error::Transport(_) => {
+            EventStreamError::Transport(_) => {
                 println!("transport error: retry in 3s");
                 RetryPolicy::<()>::WaitRetry(Duration::from_secs(3))
             }
-            Error::Parse(_) => {
+            EventStreamError::Parser(_) | EventStreamError::Utf8(_) => {
                 println!("parse error: retry immediately");
                 RetryPolicy::<()>::Repeat
             }
@@ -24,11 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     pin_mut!(stream);
     while let Some(event) = stream.next().await {
         match event {
-            Ok((event, _)) => println!(
-                "received: {:?}: {}",
-                event.event,
-                String::from_utf8_lossy(&event.data)
-            ),
+            Ok((event, _)) => println!("received: {:?}: {}", event.event, event.data),
             Err(_) => unreachable!(),
         }
     }

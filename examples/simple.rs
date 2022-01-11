@@ -11,11 +11,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     while let Some(event) = stream.next().await {
         match event {
-            Ok(event) => println!(
-                "received: {:?}: {}",
-                event.event,
-                String::from_utf8_lossy(&event.data)
-            ),
+            Ok(event) => println!("received: {:?}: {}", event.event, event.data),
             Err(e) => eprintln!("error occured: {}", e),
         }
     }

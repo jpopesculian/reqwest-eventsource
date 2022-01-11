@@ -26,7 +26,7 @@
 //! }
 //! ```
 
-pub use eventsource_stream::{Error, Event, ParseError};
+pub use eventsource_stream::{Event, EventStreamError};
 
 use core::fmt;
 use core::pin::Pin;
@@ -37,7 +37,7 @@ use futures_core::task::{Context, Poll};
 use reqwest::{RequestBuilder, Response};
 
 type ResponseFuture = BoxFuture<'static, Result<Response, reqwest::Error>>;
-type EventStream = BoxStream<'static, Result<Event, Error<reqwest::Error>>>;
+type EventStream = BoxStream<'static, Result<Event, EventStreamError<reqwest::Error>>>;
 
 /// Error raised when a [`RequestBuilder`] cannot be cloned. See [`RequestBuilder::try_clone`] for
 /// more information
@@ -94,7 +94,7 @@ impl EventsourceRequestBuilder {
 }
 
 impl Stream for EventsourceRequestBuilder {
-    type Item = Result<Event, Error<reqwest::Error>>;
+    type Item = Result<Event, EventStreamError<reqwest::Error>>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
         let this = self.projection();
@@ -108,7 +108,7 @@ impl Stream for EventsourceRequestBuilder {
                 Poll::Ready(Err(e)) => {
                     let res_future = Box::pin(this.builder.try_clone().unwrap().send());
                     this.next_response.replace(res_future);
-                    return Poll::Ready(Some(Err(Error::Transport(e))));
+                    return Poll::Ready(Some(Err(EventStreamError::Transport(e))));
                 }
                 Poll::Pending => {
                     return Poll::Pending;
@@ -117,7 +117,7 @@ impl Stream for EventsourceRequestBuilder {
         }
         match this.cur_stream.as_mut().unwrap().as_mut().poll_next(cx) {
             Poll::Ready(Some(Err(err))) => {
-                if matches!(err, Error::Transport(_)) {
+                if matches!(err, EventStreamError::Transport(_)) {
                     this.cur_stream.take();
                     let res_future = Box::pin(this.builder.try_clone().unwrap().send());
                     this.next_response.replace(res_future);
