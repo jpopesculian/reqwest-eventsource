@@ -101,9 +101,21 @@ impl Stream for EventsourceRequestBuilder {
         if let Some(response_future) = this.next_response {
             match response_future.as_mut().poll(cx) {
                 Poll::Ready(Ok(res)) => {
-                    // FIXME: only 200 should be allowed, this check is too broader
+                    // "Any other HTTP response code not listed here, as well as the cancelation of the fetch algorithm by the user agent (e.g. in response to window.stop() or the user canceling the network connection manually) must cause the user agent to fail the connection."
+                    // https://html.spec.whatwg.org/multipage/server-sent-events.html#sse-processing-model
+                    //
+                    // FIXME: only 200 should be allowed, this check is too broad
                     match res.error_for_status() {
                         Ok(_res) => {
+                            if _res.status().as_u16() == 204 {
+                                // "a client can be told to stop reconnecting using the HTTP 204 No Content response code"
+                                // https://html.spec.whatwg.org/multipage/server-sent-events.html#server-sent-events-intro
+                                return Poll::Ready(None);
+                            }
+
+                            // FIXME: "HTTP 200 OK responses that have a Content-Type specifying an unsupported type, or that have no Content-Type at all, must cause the user agent to fail the connection."
+                            // https://html.spec.whatwg.org/multipage/server-sent-events.html#sse-processing-model 
+
                             let event_stream = Box::pin(_res.bytes_stream().eventsource());
                             this.cur_stream.replace(event_stream);
                         }
