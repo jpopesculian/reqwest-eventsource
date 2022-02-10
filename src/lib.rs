@@ -101,9 +101,16 @@ impl Stream for EventsourceRequestBuilder {
         if let Some(response_future) = this.next_response {
             match response_future.as_mut().poll(cx) {
                 Poll::Ready(Ok(res)) => {
-                    this.next_response.take();
-                    let event_stream = Box::pin(res.bytes_stream().eventsource());
-                    this.cur_stream.replace(event_stream);
+                    // FIXME: only 200 should be allowed, this check is too broader
+                    match res.error_for_status() {
+                        Ok(_res) => {
+                            let event_stream = Box::pin(_res.bytes_stream().eventsource());
+                            this.cur_stream.replace(event_stream);
+                        }
+                        Err(err) => {
+                            return Poll::Ready(Some(Err(EventStreamError::Transport(err))))
+                        }
+                    }
                 }
                 Poll::Ready(Err(e)) => {
                     let res_future = Box::pin(this.builder.try_clone().unwrap().send());
