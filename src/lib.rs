@@ -114,13 +114,15 @@ impl Stream for EventsourceRequestBuilder {
                             }
 
                             // FIXME: "HTTP 200 OK responses that have a Content-Type specifying an unsupported type, or that have no Content-Type at all, must cause the user agent to fail the connection."
-                            // https://html.spec.whatwg.org/multipage/server-sent-events.html#sse-processing-model 
+                            // https://html.spec.whatwg.org/multipage/server-sent-events.html#sse-processing-model
+
+                            this.next_response.take();
 
                             let event_stream = Box::pin(_res.bytes_stream().eventsource());
                             this.cur_stream.replace(event_stream);
                         }
                         Err(err) => {
-                            return Poll::Ready(Some(Err(EventStreamError::Transport(err))))
+                            return Poll::Ready(Some(Err(EventStreamError::Transport(err))));
                         }
                     }
                 }
