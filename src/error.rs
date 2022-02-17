@@ -6,6 +6,9 @@ use reqwest::Error as ReqwestError;
 use reqwest::StatusCode;
 use std::string::FromUtf8Error;
 
+#[cfg(doc)]
+use reqwest::RequestBuilder;
+
 /// Error raised when a [`RequestBuilder`] cannot be cloned. See [`RequestBuilder::try_clone`] for
 /// more information
 #[derive(Debug, Clone, Copy)]
@@ -19,18 +22,28 @@ impl fmt::Display for CannotCloneRequestError {
 
 impl std::error::Error for CannotCloneRequestError {}
 
+/// Error raised by the EventSource stream fetching and parsing
 #[derive(Debug, Error)]
 pub enum Error {
+    /// Source stream is not valid UTF8
     #[error(transparent)]
     Utf8(FromUtf8Error),
+    /// Source stream is not a valid EventStream
     #[error(transparent)]
     Parser(NomError<String>),
+    /// The HTTP Request could not be completed
     #[error(transparent)]
     Transport(ReqwestError),
+    /// The `Content-Type` returned by the server is invalid
     #[error("Invalid header value: {0:?}")]
     InvalidContentType(HeaderValue),
+    /// The status code returned by the server is invalid
     #[error("Invalid status code: {0}")]
     InvalidStatusCode(StatusCode),
+    /// The `Last-Event-ID` cannot be formed into a Header to be submitted to the server
+    #[error("Invalid `Last-Event-ID`: {0}")]
+    InvalidLastEventId(String),
+    /// The stream ended
     #[error("Stream ended")]
     StreamEnded,
 }

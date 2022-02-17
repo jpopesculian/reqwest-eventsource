@@ -10,7 +10,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Ok(Event::Message(message)) => println!("Message: {:#?}", message),
             Err(err) => {
                 println!("Error: {}", err);
-                es.close();
+                // es.close();
             }
         }
     }

@@ -14,7 +14,7 @@ keywords = ["sse", "eventsource", "reqwest", "stream", "event"]
 categories = ["web-programming::http-client", "no-std", "parsing", "asynchronous"]
 
 [dependencies]
-eventsource-stream = "0.2.2"
+eventsource-stream = "0.2.3"
 reqwest = { version = "0.11", default-features = false, features = ["stream"] }
 futures-core = "0.3.5"
 pin-project-lite = "0.2.8"
