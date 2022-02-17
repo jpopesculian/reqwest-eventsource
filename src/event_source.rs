@@ -100,8 +100,14 @@ impl EventSource {
 }
 
 fn check_response(response: &Response) -> Result<(), Error> {
-    if !matches!(response.status(), StatusCode::OK) {
-        return Err(Error::InvalidStatusCode(response.status()));
+    match response.status() {
+        StatusCode::OK => {}
+        StatusCode::NO_CONTENT => {
+            return Err(Error::StreamEnded);
+        }
+        status => {
+            return Err(Error::InvalidStatusCode(status));
+        }
     }
     let content_type = response
         .headers()
