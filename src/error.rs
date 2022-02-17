@@ -11,12 +11,27 @@ use std::string::FromUtf8Error;
 #[derive(Debug, Clone, Copy)]
 pub struct CannotCloneRequestError;
 
+impl fmt::Display for CannotCloneRequestError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("expected a cloneable request")
+    }
+}
+
+impl std::error::Error for CannotCloneRequestError {}
+
+#[derive(Debug, Error)]
 pub enum Error {
+    #[error(transparent)]
     Utf8(FromUtf8Error),
+    #[error(transparent)]
     Parser(NomError<String>),
+    #[error(transparent)]
     Transport(ReqwestError),
+    #[error("Invalid header value: {0:?}")]
     InvalidContentType(HeaderValue),
+    #[error("Invalid status code: {0}")]
     InvalidStatusCode(StatusCode),
+    #[error("Stream ended")]
     StreamEnded,
 }
 
@@ -29,11 +44,3 @@ impl From<EventStreamError<ReqwestError>> for Error {
         }
     }
 }
-
-impl fmt::Display for CannotCloneRequestError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("expected a cloneable request")
-    }
-}
-
-impl std::error::Error for CannotCloneRequestError {}

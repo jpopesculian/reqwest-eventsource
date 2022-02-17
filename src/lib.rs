@@ -26,6 +26,9 @@
 //! }
 //! ```
 
+#[macro_use]
+extern crate thiserror;
+
 mod error;
 mod event_source;
 mod reqwest_ext;

@@ -19,14 +19,21 @@ pub trait RetryPolicy {
 pub struct ExponentialBackoff {
     pub start: Duration,
     pub factor: f64,
+    pub max_duration: Duration,
     pub max_retries: Option<usize>,
 }
 
 impl ExponentialBackoff {
-    pub const fn new(start: Duration, factor: f64, max_retries: Option<usize>) -> Self {
+    pub const fn new(
+        start: Duration,
+        factor: f64,
+        max_duration: Duration,
+        max_retries: Option<usize>,
+    ) -> Self {
         Self {
             start,
             factor,
+            max_duration,
             max_retries,
         }
     }
@@ -39,7 +46,7 @@ impl RetryPolicy for ExponentialBackoff {
         }
         if let Some((retry_num, last_duration)) = last_retry {
             if self.max_retries.is_none() || retry_num < self.max_retries.unwrap() {
-                Some(last_duration.mul_f64(self.factor))
+                Some(last_duration.mul_f64(self.factor).min(self.max_duration))
             } else {
                 None
             }
@@ -88,4 +95,4 @@ impl RetryPolicy for Never {
 }
 
 pub const DEFAULT_RETRY: ExponentialBackoff =
-    ExponentialBackoff::new(Duration::from_millis(300), 1.5, None);
+    ExponentialBackoff::new(Duration::from_millis(300), 2., Duration::from_secs(5), None);

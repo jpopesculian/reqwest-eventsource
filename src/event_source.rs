@@ -10,6 +10,7 @@ use futures_timer::Delay;
 use pin_project_lite::pin_project;
 use reqwest::header::HeaderValue;
 use reqwest::Error as ReqwestError;
+use reqwest::IntoUrl;
 use reqwest::StatusCode;
 use reqwest::{RequestBuilder, Response};
 use std::time::Duration;
@@ -18,6 +19,7 @@ type ResponseFuture = BoxFuture<'static, Result<Response, ReqwestError>>;
 type EventStream = BoxStream<'static, Result<MessageEvent, EventStreamError<ReqwestError>>>;
 type BoxedRetry = Box<dyn RetryPolicy + Send + Unpin + 'static>;
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 #[repr(u8)]
 pub enum ReadyState {
     Connecting = 0,
@@ -37,7 +39,7 @@ pub struct EventSource {
     cur_stream: Option<EventStream>,
     #[pin]
     delay: Option<Delay>,
-    ready_state: ReadyState,
+    is_closed: bool,
     retry_policy: BoxedRetry,
     last_retry: Option<(usize, Duration)>
 }
@@ -52,10 +54,28 @@ impl EventSource {
             next_response: Some(res_future),
             cur_stream: None,
             delay: None,
-            ready_state: ReadyState::Connecting,
+            is_closed: false,
             retry_policy: Box::new(DEFAULT_RETRY),
             last_retry: None,
         })
+    }
+
+    pub fn get<T: IntoUrl>(url: T) -> Self {
+        Self::new(reqwest::Client::new().get(url)).unwrap()
+    }
+
+    pub fn close(&mut self) {
+        self.is_closed = true;
+    }
+
+    pub fn ready_state(&self) -> ReadyState {
+        if self.is_closed {
+            ReadyState::Closed
+        } else if self.delay.is_some() || self.next_response.is_some() {
+            ReadyState::Connecting
+        } else {
+            ReadyState::Open
+        }
     }
 }
 
@@ -72,11 +92,13 @@ impl<'a> EventSourceProjection<'a> {
     }
 
     pub fn handle_error(&mut self, error: &Error) {
-        if let Some(retry_delay) = self.retry_policy.retry(error, self.last_retry.clone()) {
-            *self.ready_state = ReadyState::Connecting;
+        self.clear_fetch();
+        if let Some(retry_delay) = self.retry_policy.retry(error, *self.last_retry) {
+            let retry_num = self.last_retry.map(|retry| retry.0).unwrap_or(1);
+            *self.last_retry = Some((retry_num, retry_delay));
             self.delay.replace(Delay::new(retry_delay));
         } else {
-            *self.ready_state = ReadyState::Closed;
+            *self.is_closed = true;
         }
     }
 }
@@ -121,8 +143,7 @@ impl Stream for EventSource {
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
 
-        if matches!(this.ready_state, ReadyState::Closed) {
-            this.clear_fetch();
+        if *this.is_closed {
             return Poll::Ready(None);
         }
 
@@ -141,12 +162,12 @@ impl Stream for EventSource {
                 Poll::Ready(Ok(res)) => {
                     this.clear_fetch();
                     if let Err(err) = check_response(&res) {
-                        *this.ready_state = ReadyState::Closed;
+                        *this.is_closed = true;
                         return Poll::Ready(Some(Err(err)));
                     }
+                    this.last_retry.take();
                     this.cur_stream
                         .replace(Box::pin(res.bytes_stream().eventsource()));
-                    *this.ready_state = ReadyState::Open;
                     return Poll::Ready(Some(Ok(Event::Open)));
                 }
                 Poll::Ready(Err(err)) => {
@@ -171,13 +192,13 @@ impl Stream for EventSource {
             Poll::Ready(Some(Err(err))) => {
                 let err = err.into();
                 this.handle_error(&err);
-                return Poll::Ready(Some(Err(err)));
+                Poll::Ready(Some(Err(err)))
             }
             Poll::Ready(Some(Ok(event))) => Poll::Ready(Some(Ok(event.into()))),
             Poll::Ready(None) => {
                 let err = Error::StreamEnded;
                 this.handle_error(&err);
-                return Poll::Ready(Some(Err(err)));
+                Poll::Ready(Some(Err(err)))
             }
             Poll::Pending => Poll::Pending,
         }
