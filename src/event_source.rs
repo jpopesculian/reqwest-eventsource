@@ -102,9 +102,6 @@ impl EventSource {
 fn check_response(response: &Response) -> Result<(), Error> {
     match response.status() {
         StatusCode::OK => {}
-        StatusCode::NO_CONTENT => {
-            return Err(Error::StreamEnded);
-        }
         status => {
             return Err(Error::InvalidStatusCode(status));
         }
