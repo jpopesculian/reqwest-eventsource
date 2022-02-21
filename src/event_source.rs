@@ -109,7 +109,7 @@ fn check_response(response: &Response) -> Result<(), Error> {
     let content_type = response
         .headers()
         .get(&reqwest::header::CONTENT_TYPE)
-        .ok_or(Error::InvalidContentType(HeaderValue::from_static("")))?;
+        .ok_or_else(|| Error::InvalidContentType(HeaderValue::from_static("")))?;
     let mime_type: mime::Mime = content_type
         .to_str()
         .map_err(|_| Error::InvalidContentType(content_type.clone()))?
