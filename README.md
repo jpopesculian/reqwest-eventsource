@@ -8,22 +8,16 @@ requests.
 
 ## Example
 
-For more examples with delaying and error handling, take a look at the `examples/`
-
 ```rust
-let client = Client::new();
-let mut stream = client
-    .get("http://localhost:7020/notifications")
-    .eventsource()?;
-
-while let Some(event) = stream.next().await {
+let mut es = EventSource::get("http://localhost:8000/events");
+while let Some(event) = es.next().await {
     match event {
-        Ok(event) => println!(
-            "received: {:?}: {}",
-            event.event,
-            String::from_utf8_lossy(&event.data)
-        ),
-        Err(e) => eprintln!("error occured: {}", e),
+        Ok(Event::Open) => println!("Connection Open!"),
+        Ok(Event::Message(message)) => println!("Message: {:#?}", message),
+        Err(err) => {
+            println!("Error: {}", err);
+            es.close();
+        }
     }
 }
 ```
