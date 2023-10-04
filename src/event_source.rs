@@ -115,29 +115,38 @@ impl EventSource {
     }
 }
 
-fn check_response(response: &Response) -> Result<(), Error> {
+fn check_response(response: Response) -> Result<Response, Error> {
     match response.status() {
         StatusCode::OK => {}
         status => {
-            return Err(Error::InvalidStatusCode(status));
+            return Err(Error::InvalidStatusCode(status, response));
         }
     }
-    let content_type = response
-        .headers()
-        .get(&reqwest::header::CONTENT_TYPE)
-        .ok_or_else(|| Error::InvalidContentType(HeaderValue::from_static("")))?;
-    let mime_type: mime::Mime = content_type
+    let content_type =
+        if let Some(content_type) = response.headers().get(&reqwest::header::CONTENT_TYPE) {
+            content_type
+        } else {
+            return Err(Error::InvalidContentType(
+                HeaderValue::from_static(""),
+                response,
+            ));
+        };
+    if content_type
         .to_str()
-        .map_err(|_| Error::InvalidContentType(content_type.clone()))?
-        .parse()
-        .map_err(|_| Error::InvalidContentType(content_type.clone()))?;
-    if !matches!(
-        (mime_type.type_(), mime_type.subtype()),
-        (mime::TEXT, mime::EVENT_STREAM)
-    ) {
-        return Err(Error::InvalidContentType(content_type.clone()));
+        .map_err(|_| ())
+        .and_then(|s| s.parse::<mime::Mime>().map_err(|_| ()))
+        .map(|mime_type| {
+            matches!(
+                (mime_type.type_(), mime_type.subtype()),
+                (mime::TEXT, mime::EVENT_STREAM)
+            )
+        })
+        .unwrap_or(false)
+    {
+        Ok(response)
+    } else {
+        Err(Error::InvalidContentType(content_type.clone(), response))
     }
-    Ok(())
 }
 
 impl<'a> EventSourceProjection<'a> {
@@ -226,12 +235,16 @@ impl Stream for EventSource {
             match response_future.poll(cx) {
                 Poll::Ready(Ok(res)) => {
                     this.clear_fetch();
-                    if let Err(err) = check_response(&res) {
-                        *this.is_closed = true;
-                        return Poll::Ready(Some(Err(err)));
+                    match check_response(res) {
+                        Ok(res) => {
+                            this.handle_response(res);
+                            return Poll::Ready(Some(Ok(Event::Open)));
+                        }
+                        Err(err) => {
+                            *this.is_closed = true;
+                            return Poll::Ready(Some(Err(err)));
+                        }
                     }
-                    this.handle_response(res);
-                    return Poll::Ready(Some(Ok(Event::Open)));
                 }
                 Poll::Ready(Err(err)) => {
                     let err = Error::Transport(err);
