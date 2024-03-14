@@ -134,8 +134,16 @@ fn check_response(response: Response) -> Result<Response, Error> {
     if content_type
         .to_str()
         .map_err(|_| ())
-        .and_then(|s| s.split(';').next().ok_or(()))
-        .and_then(|s| s.parse::<mime::Mime>().map_err(|_| ()))
+        .and_then(|s| {
+            s.parse::<mime::Mime>()
+                .map_err(|_| (()))
+                // Fallback to content type without parameters.
+                .or_else(|_|  match s.contains(";") {
+                        true => s.split(';').next().map(|s| s.parse::<mime::Mime>().map_err(|_| (()))).unwrap(),
+                        false => Err(())
+                    }
+                )   
+        })
         .map(|mime_type| {
             matches!(
                 (mime_type.type_(), mime_type.subtype()),
