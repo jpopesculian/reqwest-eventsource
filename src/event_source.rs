@@ -138,11 +138,14 @@ fn check_response(response: Response) -> Result<Response, Error> {
             s.parse::<mime::Mime>()
                 .map_err(|_| (()))
                 // Fallback to content type without parameters.
-                .or_else(|_|  match s.contains(";") {
-                        true => s.split(';').next().map(|s| s.parse::<mime::Mime>().map_err(|_| (()))).unwrap(),
-                        false => Err(())
-                    }
-                )   
+                .or_else(|_| match s.contains(";") {
+                    true => s
+                        .split(';')
+                        .next()
+                        .map(|s| s.parse::<mime::Mime>().map_err(|_| (())))
+                        .unwrap(),
+                    false => Err(()),
+                })
         })
         .map(|mime_type| {
             matches!(
