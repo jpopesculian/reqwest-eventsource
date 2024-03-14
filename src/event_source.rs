@@ -134,6 +134,7 @@ fn check_response(response: Response) -> Result<Response, Error> {
     if content_type
         .to_str()
         .map_err(|_| ())
+        .and_then(|s| s.split(';').next().ok_or(()))
         .and_then(|s| s.parse::<mime::Mime>().map_err(|_| ()))
         .map(|mime_type| {
             matches!(
