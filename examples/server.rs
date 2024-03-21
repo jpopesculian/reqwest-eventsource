@@ -19,7 +19,7 @@ impl<'r> rocket::request::FromRequest<'r> for LastEventId {
             } else {
                 match id.parse() {
                     Ok(id) => Outcome::Success(LastEventId(id)),
-                    Err(err) => Outcome::Failure((Status::BadRequest, err)),
+                    Err(err) => Outcome::Error((Status::BadRequest, err)),
                 }
             }
         } else {
