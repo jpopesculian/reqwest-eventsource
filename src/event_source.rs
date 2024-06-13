@@ -184,7 +184,7 @@ impl<'a> EventSourceProjection<'a> {
     fn handle_error(&mut self, error: &Error) {
         self.clear_fetch();
         if let Some(retry_delay) = self.retry_policy.retry(error, *self.last_retry) {
-            let retry_num = self.last_retry.map(|retry| retry.0).unwrap_or(1);
+            let retry_num = self.last_retry.map(|retry| retry.0.saturating_add(1)).unwrap_or(1);
             *self.last_retry = Some((retry_num, retry_delay));
             self.delay.replace(Delay::new(retry_delay));
         } else {
